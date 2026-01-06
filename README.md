@@ -1,33 +1,58 @@
-# nvim-plugin-template
+# 🪨 gravel.nvim
 
-Neovim plugin template; includes automatic documentation generation from README, integration tests with Busted, and linting with Stylua
+**The coarse, non-shiny alternative to Obsidian.**
 
-## Usage
+## What is this?
 
-1. Click `use this template` button generate a repo on your github.
-2. Clone your plugin repo. Open terminal then cd plugin directory.
-3. Run `python3 rename.py your-plugin-name`. This will replace all `nvim-plugin-template` to your `plugin-name`. 
-   Then it will prompt you input `y` or `n` to remove example codes in `init.lua` and
-   `test/plugin_spec.lua`. If you are familiar this repo just input `y`. If you are looking at this template for the first time I suggest you inspect the contents. After this step `rename.py` will also auto-remove.
+Obsidian is beautiful, sharp, volcanic glass. It is prized by geologists and productivity gurus alike.
 
-Now you have a clean plugin environment. Enjoy!
+**This is Gravel.**
 
-## Format
+It is small, loose, and arguably much less valuable. But if you pile enough of it together, you can build a driveway. `gravel.nvim` brings the "loose rocks" approach to note-taking in Neovim. It supports WikiLinks, daily notes, and standard Zettelkasten features, but without the electron bloat or the shiny finish.
 
-The CI uses `stylua` to format the code; customize the formatting by editing `.stylua.toml`.
+> "I don't need a monolith. I just need a pile of rocks." — *Happy User*
 
-## Test
+## ✨ Features (The Piles)
 
-See [Running tests locally](https://github.com/nvim-neorocks/nvim-busted-action?tab=readme-ov-file#running-tests-locally)
+* **Loose Coupling:** Just like gravel, your notes sit next to each other without being glued down.
+* **Rough Edges:** No GUI, no fancy graphs (yet), just raw text manipulation.
+* **Daily Pebbles:** A command to quickly open today's daily note.
+* **Link Toss:** Quickly follow `[[wikilinks]]` to jump between stones.
 
-## CI
+## 📦 Installation
 
-- Auto generates doc from README.
-- Runs the [nvim-busted-action](https://github.com/nvim-neorocks/nvim-busted-action) for test.
-- Lints with `stylua`.
+Use your favorite package manager. If you use `lazy.nvim`:
 
-## More
+```lua
+{
+    "tDalile/gravel.nvim",
+    dependencies = { "nvim-lua/plenary.nvim" },
+    config = function()
+        require("gravel").setup({
+            path = "~/gravel_pit", -- Where you keep your rocks
+            daily_format = "%Y-%m-%d",
+        })
+    end
+}
 
-To see this template in action, take a look at my other plugins.
+```
 
-## License MIT
+## 🚀 Usage
+
+* `:GravelToss` - Create or follow a link under the cursor.
+* `:GravelDig` - Search for a note (uses Telescope if available, otherwise it just guesses).
+* `:GravelToday` - Open today's daily note.
+
+## 🗺️ Roadmap
+
+* [ ] Add more rocks.
+* [ ] Make the rocks smoother.
+* [ ] Eventually build a driveway (Graph View).
+
+## 🤝 Contributing
+
+Found a bug? It's probably just some dirt mixed in with the stones. Feel free to open a PR or an Issue.
+
+---
+
+*Made with ❤️ and Lua.*
