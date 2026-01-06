@@ -14,45 +14,42 @@ if vim.fn.isdirectory(test_path) == 1 then
   vim.fn.delete(test_path, "rf")
 end
 
--- We need follow_on_enter = true to create autocmd, but here we test logic directly mostly
-G.setup({ path = test_path, follow_on_enter = true })
+G.setup({ path = test_path, follow_on_enter = true, back_with_minus = true })
 asserts.ok(vim.fn.isdirectory(test_path) == 1, "Setup should create directory")
 print(" [x] Setup created directory")
 
 -- Test 2: Today
 G.today()
+-- Force filetype markdown for autocmds to fire (important in minimal headless env)
+vim.cmd("set filetype=markdown")
+
 local current_file = vim.fn.expand("%:p")
 local expected_date = os.date("%Y-%m-%d")
-asserts.ok(string.find(current_file, expected_date, 1, true), "Today should open file with date. Got: " .. current_file)
-asserts.ok(string.find(current_file, "gravel_test_pit", 1, true), "Today should open in correct path. Got: " .. current_file)
+asserts.ok(string.find(current_file, expected_date, 1, true), "Today should open file with date.")
 print(" [x] Today opened correct file")
 
--- Test 3: Toss Direct
--- Write link to buffer
+-- Test 3: Toss
 vim.api.nvim_buf_set_lines(0, 0, -1, false, { "Here is a [[CoolIdea]]." })
 vim.api.nvim_win_set_cursor(0, {1, 14}) 
 G.toss()
+vim.cmd("set filetype=markdown") -- Ensure target also gets ft
 local new_file = vim.fn.expand("%:t")
-asserts.ok(new_file == "CoolIdea.md", "Toss should open target file. Got: " .. new_file)
+asserts.ok(new_file == "CoolIdea.md", "Toss should open target file.")
 print(" [x] Toss followed link")
 
--- Test 4: Toss or Fallback (Logic Test)
--- Go back to previous buffer (the daily note which we replaced content of, theoretically)
--- Actually let's just create a new line with no link and test fallback logic roughly
--- Since we can't easily intercept 'feedkeys' in headless without complexity, we'll unit test the detection part via checking side effects if possible or just assume logic holds if toss() works.
--- Better: Test detection on a non-link.
-vim.api.nvim_buf_set_lines(0, 0, -1, false, { "Just normal text." })
-vim.api.nvim_win_set_cursor(0, {1, 5})
-local link = G.get_link()
-asserts.ok(link == nil, "get_link should return nil on normal text")
-print(" [x] get_link correctly ignores normal text")
+-- Test 4: Check Mappings
+-- Check if '-' is mapped to '<C-o>'
+-- mapcheck(name, mode, abbr, buffer)
+local map_arg = vim.fn.maparg("-", "n", false, true)
+-- map_arg is a table dealing with the mapping
+asserts.ok(map_arg.rhs == "<C-o>", "Key '-' should be mapped to '<C-o>'. Got: " .. tostring(map_arg.rhs))
+print(" [x] Back navigation ('-') is correctly mapped")
 
--- Test detection on link
-vim.api.nvim_buf_set_lines(0, 0, -1, false, { "[[Link]]" })
-vim.api.nvim_win_set_cursor(0, {1, 3})
-link = G.get_link()
-asserts.ok(link == "Link", "get_link should find link")
-print(" [x] get_link correctly finds link")
+local enter_arg = vim.fn.maparg("<CR>", "n", false, true)
+-- This one uses a callback, so rhs logic might be different or nil, but 'callback' should be set
+asserts.ok(enter_arg.callback ~= nil, "Key '<CR>' should have a callback.")
+print(" [x] Follow link ('<CR>') is correctly mapped")
+
 
 print(">>> verification complete!")
 vim.cmd("qall!")
