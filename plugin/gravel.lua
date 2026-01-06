@@ -14,3 +14,7 @@ end, {})
 vim.api.nvim_create_user_command("GravelDig", function()
 	require("gravel").dig()
 end, {})
+
+vim.api.nvim_create_user_command("GravelSidebar", function()
+	require("gravel").toggle_sidebar()
+end, {})

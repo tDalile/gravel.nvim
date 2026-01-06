@@ -29,6 +29,21 @@ function M.setup(opts)
 			end,
 		})
 	end
+
+    -- Sidebar Auto-Update
+    vim.api.nvim_create_autocmd("BufEnter", {
+        pattern = "*",
+        callback = function()
+            -- Only attempt update if we are in a sidebar-compatible context or if sidebar is loaded
+            if package.loaded["gravel.sidebar"] then
+                require("gravel.sidebar").update()
+            end
+        end
+    })
+end
+
+function M.toggle_sidebar()
+    require("gravel.sidebar").toggle()
 end
 
 function M.today()
