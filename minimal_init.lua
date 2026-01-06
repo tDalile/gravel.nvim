@@ -31,6 +31,7 @@ require("lazy").setup({
             path = vim.fn.expand("./gravel_dev_pit"), -- Local test pit
             daily_format = "%Y-%m-%d",
             follow_on_enter = true, 
+             back_with_minus = true,
         })
     end
   }
