@@ -49,16 +49,27 @@ function M.open()
     c.graph = Graph.new()
     c.physics = Physics.new(c.graph)
     c.physics.width = width * 2 
-    c.canvas = Canvas.new(width, height)
+    c.physics = Physics.new(c.graph)
+    c.physics.width = width * 2 
+    c.canvas = Canvas.new(width, height - 2) -- Reserve Top (Status) and Bottom (Help)
     
     c.physics.width = c.canvas.pixel_width
     c.physics.height = c.canvas.pixel_height
     
+    -- Auto-Focus: Capture current buffer name (basename)
+    local current_file = vim.fn.expand("%:t:r")
+    if current_file and current_file ~= "" then
+        M.state.initial_focus = current_file
+    else
+        M.state.initial_focus = nil
+    end
     M.state.focused_node = nil
     
     -- Setup Keymap
     local opts = { buffer = c.buf, nowait = true, silent = true }
     vim.keymap.set("n", "<CR>", M.enter_node, opts)
+    vim.keymap.set("n", "g?", M.toggle_help, opts)
+    vim.keymap.set("n", "q", M.close, opts)
     
     -- Smart Navigation
     vim.keymap.set("n", "h", function() M.move_focus("left") end, opts)
@@ -167,8 +178,13 @@ function M.step()
     
     -- Ensure we have a focus if nodes exist
     if not c.focused_node and c.graph.node_count > 0 then
-        -- Default to first
-        c.focused_node = c.graph.nodes_list[1].id
+        -- Default to initial_focus if valid, else first node
+        if c.initial_focus and c.graph.nodes[c.initial_focus] then
+            c.focused_node = c.initial_focus
+            c.initial_focus = nil -- Clear so we don't override user navigation later
+        else
+            c.focused_node = c.graph.nodes_list[1].id
+        end
     end
     
     -- Park cursor at 1,1 to "hide" it (User preference)
@@ -211,25 +227,41 @@ function M.step()
         c.canvas:set_symbol(node.x, node.y, "●", hl)
     end
     
-    local lines, highlights = c.canvas:render()
+    local canvas_lines, highlights = c.canvas:render()
     
-    -- Debug Overlay
-    local status = string.format("Nodes: %d | Edges: %d | Path: %s", 
+    -- Assemble Buffer Lines
+    -- 1. Status Line (Top)
+    local status = string.format(" Nodes: %d | Edges: %d | Path: %s", 
         c.graph.node_count, #c.graph.edges, Gravel.config.path)
-    if #lines > 0 then
-        lines[1] = status .. " | " .. lines[1]
-    else
-        table.insert(lines, status)
+    
+    local final_lines = {}
+    table.insert(final_lines, status)
+    
+    -- 2. Canvas Lines (Middle)
+    for _, line in ipairs(canvas_lines) do
+        table.insert(final_lines, line)
     end
     
-    vim.api.nvim_buf_set_lines(c.buf, 0, -1, false, lines)
+    -- 3. Help Hint (Bottom)
+    table.insert(final_lines, " g?: Help ")
+    
+    vim.api.nvim_buf_set_lines(c.buf, 0, -1, false, final_lines)
     
     -- Apply Highlights
     vim.api.nvim_buf_clear_namespace(c.buf, ns_id, 0, -1)
+    
+    -- Highlight Status (Line 0)
+    vim.api.nvim_buf_add_highlight(c.buf, ns_id, "Comment", 0, 0, -1)
+    
+    -- Highlight Canvas (Lines 1 to N-1)
+    -- Adjust highlight row indices by +1 because of status line
     for _, h in ipairs(highlights) do
         -- h: {line, col_start, col_end, group}
-        vim.api.nvim_buf_add_highlight(c.buf, ns_id, h[4], h[1], h[2], h[3])
+        vim.api.nvim_buf_add_highlight(c.buf, ns_id, h[4], h[1] + 1, h[2], h[3])
     end
+    
+    -- Highlight Help Hint (Last Line)
+    vim.api.nvim_buf_add_highlight(c.buf, ns_id, "GravelNodeFocus", #final_lines - 1, 0, 10)
     
     -- Apply Label via Virtual Text
     if focused_node_obj then
@@ -241,11 +273,60 @@ function M.step()
             virt_text_pos = "overlay",
             virt_text_win_col = math.max(0, char_x - math.floor(#focused_node_obj.id / 2))
         }
-        -- Add at line + 1
-        if char_y + 1 < #lines then
-             vim.api.nvim_buf_set_extmark(c.buf, ns_id, char_y + 1, 0, label_opts)
+        -- Adjust Y for status line offset (+1)
+        local target_row = char_y + 1 + 1 
+        if target_row < #final_lines then
+             vim.api.nvim_buf_set_extmark(c.buf, ns_id, target_row, 0, label_opts)
         end
     end
+end
+    
+function M.toggle_help()
+    local c = M.state
+    if c.help_win and vim.api.nvim_win_is_valid(c.help_win) then
+        vim.api.nvim_win_close(c.help_win, true)
+        c.help_win = nil
+        return
+    end
+    
+    -- Create Help Window
+    local buf = vim.api.nvim_create_buf(false, true)
+    local width = 40
+    local height = 8
+    local ui = vim.api.nvim_list_uis()[1]
+    local row = math.floor((ui.height - height) / 2)
+    local col = math.floor((ui.width - width) / 2)
+    
+    local win_opts = {
+        relative = "editor",
+        width = width,
+        height = height,
+        row = row,
+        col = col,
+        style = "minimal",
+        border = "rounded",
+        title = " Gravel Navigation ",
+        title_pos = "center"
+    }
+    
+    local lines = {
+        "",
+        "  h, j, k, l :  Jump to Node",
+        "  <Enter>    :  Open Node",
+        "  g?         :  Toggle Help",
+        "  q          :  Close Graph",
+        "",
+        "  " .. Gravel.config.path
+    }
+    
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    c.help_win = vim.api.nvim_open_win(buf, true, win_opts)
+    
+    -- Close on keypress
+    local close_opts = { buffer = buf, nowait = true, silent = true }
+    vim.keymap.set("n", "q", M.toggle_help, close_opts)
+    vim.keymap.set("n", "g?", M.toggle_help, close_opts)
+    vim.keymap.set("n", "<Esc>", M.toggle_help, close_opts)
 end
 
 return M
