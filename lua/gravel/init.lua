@@ -20,6 +20,7 @@ function M.setup(opts)
     set_hl("GravelNodeMid", { fg = "#8be9fd", default = true })             -- Cyan
     set_hl("GravelNodeLeaf", { fg = "#6272a4", default = true })            -- Comment/Grey
     set_hl("GravelEdge", { fg = "#44475a", default = true })                -- Dark Grey
+    set_hl("GravelNodeFocus", { fg = "#ffffff", bold = true, default = true }) -- White Focus
 
 	-- Ensure directory exists
 	if vim.fn.isdirectory(M.config.path) == 0 then
