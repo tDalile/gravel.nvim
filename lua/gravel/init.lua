@@ -11,6 +11,16 @@ function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", M.config, opts or {})
 	M.config.path = vim.fn.expand(M.config.path)
 
+    -- Define Highlights
+    local function set_hl(name, opts)
+        vim.api.nvim_set_hl(0, name, opts)
+    end
+    -- Default colors if not present in scheme
+    set_hl("GravelNodeHub", { fg = "#ff79c6", bold = true, default = true }) -- Pink
+    set_hl("GravelNodeMid", { fg = "#8be9fd", default = true })             -- Cyan
+    set_hl("GravelNodeLeaf", { fg = "#6272a4", default = true })            -- Comment/Grey
+    set_hl("GravelEdge", { fg = "#44475a", default = true })                -- Dark Grey
+
 	-- Ensure directory exists
 	if vim.fn.isdirectory(M.config.path) == 0 then
 		vim.fn.mkdir(M.config.path, "p")
@@ -40,10 +50,18 @@ function M.setup(opts)
             end
         end
     })
+    
+    vim.api.nvim_create_user_command("GravelPile", function()
+        require("gravel.pile").toggle()
+    end, {})
 end
 
 function M.toggle_sidebar()
     require("gravel.sidebar").toggle()
+end
+
+function M.toggle_pile()
+    require("gravel.pile").toggle()
 end
 
 function M.today()

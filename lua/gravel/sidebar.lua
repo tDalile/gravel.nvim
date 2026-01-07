@@ -1,5 +1,5 @@
 local M = {}
-local gravel = require("gravel.init")
+local gravel = require("gravel")
 
 M.state = {
     win_outline = nil,
