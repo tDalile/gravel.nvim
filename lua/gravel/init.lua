@@ -31,7 +31,7 @@ function M.setup(opts)
 	end
 
     -- Sidebar Auto-Update
-    vim.api.nvim_create_autocmd("BufEnter", {
+    vim.api.nvim_create_autocmd({ "BufEnter", "BufWritePost" }, {
         pattern = "*",
         callback = function()
             -- Only attempt update if we are in a sidebar-compatible context or if sidebar is loaded
