@@ -6,11 +6,11 @@ M.Physics.__index = M.Physics
 function M.new(graph)
     local self = setmetatable({}, M.Physics)
     self.graph = graph
-    self.repulsion = 10000 -- Increased from 2000 for symbol spacing
+    self.repulsion = 6000 -- Decreased from 10000 for gentler spread
     self.stiffness = 1 -- spring stiffness
-    self.damping = 0.9
-    self.center_force = 0.5
-    self.dt = 0.1
+    self.damping = 0.7 -- Strong friction to stop movement quickly
+    self.center_force = 0.2 -- Gentler pull
+    self.dt = 0.05 -- More precise steps
     self.width = 100
     self.height = 100
     return self
@@ -82,6 +82,13 @@ function M.Physics:step()
         -- Damping
         n.vx = n.vx * self.damping
         n.vy = n.vy * self.damping
+        
+        -- Cutoff to kill micro-movements
+        -- Increased threshold to stop slow center drift
+        if (n.vx * n.vx + n.vy * n.vy) < 1.0 then
+            n.vx = 0
+            n.vy = 0
+        end
     end
 end
 

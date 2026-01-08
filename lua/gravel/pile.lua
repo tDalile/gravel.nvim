@@ -80,7 +80,18 @@ function M.open()
     -- Start Scan
     local path = Gravel.config.path
     Scanner.scan(path, c.graph, function(done)
-       -- optional callback logic
+       if done and c.physics then
+           -- Center all nodes to explode from middle
+           local cx = c.physics.width / 2
+           local cy = c.physics.height / 2
+           for _, node in ipairs(c.graph.nodes_list) do
+               -- Small random jitter to avoid stacking perfectly
+               node.x = cx + (math.random() - 0.5) * 5
+               node.y = cy + (math.random() - 0.5) * 5
+               node.vx = 0
+               node.vy = 0
+           end
+       end
     end)
     
     -- Start Loop

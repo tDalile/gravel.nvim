@@ -16,8 +16,8 @@ function M.Graph:add_node(id)
     if not self.nodes[id] then
         local node = {
             id = id,
-            x = math.random() * 100, -- Initial random pos
-            y = math.random() * 100,
+            x = 40 + math.random() * 20, -- Initial random pos centered (40-60)
+            y = 40 + math.random() * 20,
             vx = 0,
             vy = 0,
             mass = 1,
