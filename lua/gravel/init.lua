@@ -102,6 +102,29 @@ function M.toss()
 
 	if link then
 		local target = link:match("([^|]+)") or link
+        
+        -- Check for URL
+        if target:match("^https?://") then
+            -- Open in browser
+            -- Use vim.ui.open if available (nvim 0.10+), else fallback could be added but let's assume vim.ui.open or netrw
+            -- Actually vim.ui.open is robust.
+            if vim.ui.open then
+                vim.ui.open(target)
+            else
+                -- Fallback for older nvim or if ui.open not set?
+                -- Most modern configs have it or use netrw's gx behavior.
+                -- Let's try explicit fallback to xdg-open for linux users if needed, 
+                -- but sticking to vim.ui.open is key for modern nvim.
+                local cmd
+                if vim.fn.has("mac") == 1 then cmd = "open"
+                elseif vim.fn.has("unix") == 1 then cmd = "xdg-open"
+                elseif vim.fn.has("win32") == 1 then cmd = "start"
+                end
+                if cmd then vim.fn.jobstart({cmd, target}, {detach = true}) end
+            end
+            return true
+        end
+
 		local filepath = M.config.path .. "/" .. target .. ".md"
 		vim.cmd.edit(filepath)
 		return true

@@ -187,7 +187,7 @@ function M.step()
         end
     end
     
-    -- Park cursor at 1,1 to "hide" it (User preference)
+    -- Park cursor at 1,1 to "hide" it
     if c.win and vim.api.nvim_win_is_valid(c.win) then
         vim.api.nvim_win_set_cursor(c.win, {1, 0})
     end

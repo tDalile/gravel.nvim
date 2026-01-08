@@ -87,8 +87,11 @@ function M._process_lines(lines, graph)
                 -- clean target (remove alias |...)
                 target_id = target_id:match("([^|]+)") or target_id
                 
-                if source_id ~= target_id then
-                    graph:add_edge(source_id, target_id)
+                -- Ignore URLs
+                if not target_id:match("^https?://") then
+                    if source_id ~= target_id then
+                        graph:add_edge(source_id, target_id)
+                    end
                 end
             end
         end
