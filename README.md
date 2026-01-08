@@ -66,6 +66,7 @@ Use your favorite package manager. If you use `lazy.nvim`:
 * [ ] Make the rocks smoother.
 * [ ] I like my piles neat and tidy (Templats).
 * [ ] Counting pebbles (Love stats).
+* [ ] Some pebbles might need pictures?! (assets).
 * [x] Eventually build a driveway (Graph View).
 
 ## 🤝 Contributing
