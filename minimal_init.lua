@@ -36,6 +36,7 @@ require('lazy').setup({
         daily_format = '%Y-%m-%d',
         follow_on_enter = true,
         back_with_minus = true,
+        animate_edges = true,
       })
     end,
   },

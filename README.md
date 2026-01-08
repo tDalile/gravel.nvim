@@ -30,6 +30,9 @@ Use your favorite package manager. If you use `lazy.nvim`:
     dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim" },
     config = function()
         require("gravel").setup({
+            -- Optional:
+            -- follow_on_enter = false, -- Bind <CR> to follow link
+            -- animate_edges = true,    -- Toggle directional edge animation
             -- Define your piles here
             piles = {
                 { name = "Default", path = "~/gravel_pit" },

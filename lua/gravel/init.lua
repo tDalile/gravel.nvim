@@ -4,7 +4,9 @@ M.config = {
 	path = "~/gravel_pit",
 	daily_format = "%Y-%m-%d",
 	follow_on_enter = false,
+	follow_on_enter = false,
 	back_with_minus = false,
+    animate_edges = true, -- Enable particle animation on focused edges
     -- piles = nil -- will be initialized in setup
 }
 
@@ -57,6 +59,8 @@ function M.setup(opts)
     set_hl("GravelNodeLeaf", { fg = "#6272a4", default = true })            -- Comment/Grey
     set_hl("GravelEdge", { fg = "#44475a", default = true })                -- Dark Grey
     set_hl("GravelNodeFocus", { fg = "#ffffff", bold = true, default = true }) -- White Focus
+    set_hl("GravelEdgeFocus", { fg = "#ff79c6", bold = true, default = true }) -- Pink Highlight Edge
+    set_hl("GravelEdgeAnim", { fg = "#50fa7b", bold = true, default = true })  -- Green Particle
 
 	-- Ensure directory exists
 	if vim.fn.isdirectory(M.config.path) == 0 then

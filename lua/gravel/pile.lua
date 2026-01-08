@@ -195,13 +195,51 @@ function M.step()
     -- Render
     c.canvas:clear()
     
-    -- Draw Edges (Dark Grey)
+    -- Draw Edges
+    -- We'll draw them in two passes: dimmed (unfocused) then focused
+    local focused_edges = {}
+    
+    local anim_cycle_ms = 1500 --ms for one "particle" to traverse
+    local now_ms = vim.uv.now()
+    local t = (now_ms % anim_cycle_ms) / anim_cycle_ms -- 0.0 to 1.0
+
     for _, edge in ipairs(c.graph.edges) do
-        c.canvas:draw_line(
-            edge.source.x, edge.source.y, 
-            edge.target.x, edge.target.y,
-            "GravelEdge"
-        )
+        local is_focused = (c.focused_node and (edge.source.id == c.focused_node or edge.target.id == c.focused_node))
+        
+        if is_focused then
+            table.insert(focused_edges, edge)
+        else
+            -- Dimmed standard edge
+            c.canvas:draw_line(
+                edge.source.x, edge.source.y, 
+                edge.target.x, edge.target.y,
+                "GravelEdge"
+            )
+        end
+    end
+
+    -- Draw Focused Edges & Animation on top
+    for _, edge in ipairs(focused_edges) do
+        local sx, sy = edge.source.x, edge.source.y
+        local tx, ty = edge.target.x, edge.target.y
+        
+        -- Highlight Line (Always if focused)
+        c.canvas:draw_line(sx, sy, tx, ty, "GravelEdgeFocus")
+        
+        -- Animate Particle (Direction: Source -> Target)
+        if Gravel.config.animate_edges then
+            local px = sx + (tx - sx) * t
+            local py = sy + (ty - sy) * t
+            
+            -- Draw simple dot
+            c.canvas:set_symbol(px, py, "•", "GravelEdgeAnim")
+        end
+        
+        -- Maybe a second dot for longer lines?
+        -- local t2 = (t + 0.5) % 1.0
+        -- local px2 = sx + (tx - sx) * t2
+        -- local py2 = sy + (ty - sy) * t2
+        -- c.canvas:set_symbol(px2, py2, "·", "GravelEdgeAnim")
     end
     
     local focused_node_obj = nil
