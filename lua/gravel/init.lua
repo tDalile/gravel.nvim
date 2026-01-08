@@ -75,6 +75,14 @@ function M.setup(opts)
     vim.api.nvim_create_user_command("GravelPiles", function()
         M.select_pile()
     end, {})
+
+    vim.api.nvim_create_user_command("GravelTags", function()
+        M.select_tag("search")
+    end, {})
+
+    vim.api.nvim_create_user_command("GravelTagInsert", function()
+        M.select_tag("insert")
+    end, {})
 end
 
 function M.toggle_sidebar()
@@ -212,6 +220,123 @@ function M.select_pile()
             M.switch_pile(choice)
         end
     end)
+end
+
+function M.get_tags()
+    local path = M.config.path
+    -- Get raw list of all tags (duplicates included)
+    -- Added --no-filename (-h) to prevent file paths in output
+    local cmd = "rg --no-filename --no-heading --no-line-number --only-matching '#[a-zA-Z0-9_%-]+' " .. vim.fn.shellescape(path)
+    local output = vim.fn.systemlist(cmd)
+    
+    local counts = {}
+    for _, tag in ipairs(output) do
+        -- Trimming just in case, though usually clean with matching
+        tag = tag:match("^%s*(.-)%s*$")
+        if tag and tag ~= "" then
+             counts[tag] = (counts[tag] or 0) + 1
+        end
+    end
+    
+    local results = {}
+    for tag, count in pairs(counts) do
+        table.insert(results, { tag = tag, count = count })
+    end
+    
+    -- Sort by count desc, then alpha
+    table.sort(results, function(a, b)
+        if a.count ~= b.count then
+            return a.count > b.count
+        end
+        return a.tag < b.tag
+    end)
+    
+    return results
+end
+
+function M.select_tag(mode)
+    local tags = M.get_tags()
+    if #tags == 0 then
+        vim.notify("No tags found in current pile.", vim.log.levels.INFO)
+        return
+    end
+
+    -- Try Telescope First
+    local has_telescope, pickers = pcall(require, "telescope.pickers")
+    local has_finders, finders = pcall(require, "telescope.finders")
+    local has_conf, conf = pcall(require, "telescope.config")
+    local has_actions, actions = pcall(require, "telescope.actions")
+    local has_state, action_state = pcall(require, "telescope.actions.state")
+    local has_entry_display, entry_display = pcall(require, "telescope.pickers.entry_display")
+
+    if has_telescope then
+        
+        local displayer = entry_display.create {
+            separator = " ",
+            items = {
+                { width = 30 }, -- Tag
+                { remaining = true }, -- Count
+            },
+        }
+        
+        local make_display = function(entry)
+            return displayer {
+                entry.value.tag,
+                "(" .. entry.value.count .. ")",
+            }
+        end
+
+        pickers.new({}, {
+            prompt_title = "Gravel Tags (" .. mode .. ")",
+            finder = finders.new_table {
+                results = tags,
+                entry_maker = function(entry)
+                    return {
+                        value = entry,
+                        display = make_display,
+                        ordinal = entry.tag,
+                    }
+                end
+            },
+            sorter = conf.values.generic_sorter({}),
+            attach_mappings = function(prompt_bufnr, map)
+                actions.select_default:replace(function()
+                    actions.close(prompt_bufnr)
+                    local selection = action_state.get_selected_entry()
+                    local item = selection.value
+                    
+                    if mode == "insert" then
+                        vim.api.nvim_put({item.tag}, "c", true, true)
+                    else
+                        -- Search (Grep)
+                        -- Open new Telescope for the selected tag
+                        require("telescope.builtin").grep_string({ 
+                            cwd = M.config.path, 
+                            search = item.tag, 
+                            use_regex = false 
+                        })
+                    end
+                end)
+                return true
+            end
+        }):find()
+    else
+        -- Fallback to vim.ui.select
+        vim.ui.select(tags, {
+            prompt = "Select Tag (" .. mode .. "):",
+            format_item = function(item)
+                return string.format("%s (%d)", item.tag, item.count)
+            end
+        }, function(choice)
+            if choice then
+                if mode == "insert" then
+                    vim.api.nvim_put({choice.tag}, "c", true, true)
+                else
+                    vim.notify("Telescope not found. Install it for Tag Search.", vim.log.levels.WARN)
+                end
+            end
+        end)
+    end
 end
 
 return M
