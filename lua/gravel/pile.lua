@@ -275,7 +275,7 @@ function M.step()
         }
         -- Adjust Y for status line offset (+1)
         local target_row = char_y + 1 + 1 
-        if target_row < #final_lines then
+        if target_row >= 0 and target_row < #final_lines then
              vim.api.nvim_buf_set_extmark(c.buf, ns_id, target_row, 0, label_opts)
         end
     end
@@ -292,7 +292,7 @@ function M.toggle_help()
     -- Create Help Window
     local buf = vim.api.nvim_create_buf(false, true)
     local width = 40
-    local height = 8
+    local height = 6
     local ui = vim.api.nvim_list_uis()[1]
     local row = math.floor((ui.height - height) / 2)
     local col = math.floor((ui.width - width) / 2)
@@ -316,7 +316,6 @@ function M.toggle_help()
         "  g?         :  Toggle Help",
         "  q          :  Close Graph",
         "",
-        "  " .. Gravel.config.path
     }
     
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
