@@ -10,7 +10,7 @@ Obsidian is beautiful, sharp, volcanic glass. It is prized by geologists and pro
 
 It is small, loose, and arguably much less valuable. But if you pile enough of it together, you can build a driveway. `gravel.nvim` brings the "loose rocks" approach to note-taking in Neovim. It supports WikiLinks, daily notes, multiple piles, tags, and a physics-based graph view, but without the electron bloat or the shiny finish.
 
-> "I don't need a monolith. I just need a pile of rocks." — *Happy User*
+> "I don't need a monolith. I just need a pile of rocks." — *Happy User (Me)*
 
 ## ✨ Features
 
