@@ -8,16 +8,17 @@ Obsidian is beautiful, sharp, volcanic glass. It is prized by geologists and pro
 
 **This is Gravel.**
 
-It is small, loose, and arguably much less valuable. But if you pile enough of it together, you can build a driveway. `gravel.nvim` brings the "loose rocks" approach to note-taking in Neovim. It supports WikiLinks, daily notes, and standard Zettelkasten features, but without the electron bloat or the shiny finish.
+It is small, loose, and arguably much less valuable. But if you pile enough of it together, you can build a driveway. `gravel.nvim` brings the "loose rocks" approach to note-taking in Neovim. It supports WikiLinks, daily notes, multiple piles, tags, and a physics-based graph view, but without the electron bloat or the shiny finish.
 
 > "I don't need a monolith. I just need a pile of rocks." — *Happy User*
 
-## ✨ Features (The Piles)
+## ✨ Features
 
-* **Loose Coupling:** Just like gravel, your notes sit next to each other without being glued down.
-* **Rough Edges:** No GUI, no fancy graphs (yet), just raw text manipulation.
-* **Daily Pebbles:** A command to quickly open today's daily note.
-* **Link Toss:** Quickly follow `[[wikilinks]]` to jump between stones.
+*   **Multiple Piles:** Manage independent collections of notes (Work, Personal, etc.) and switch between them instantly.
+*   **Physics-Based Graph:** Visualizes your notes as nodes. Interactive! Jump with `h/j/k/l` and open with `<Enter>`.
+*   **Tag Management:** Centralized `#tag` browser with usage counts. Avoids duplicates.
+*   **Link Toss:** Follow `[[wikilinks]]` or open `[[http://...]]` URLs in your browser.
+*   **Daily Pebbles:** Quickly open today's daily note.
 
 ## 📦 Installation
 
@@ -26,28 +27,39 @@ Use your favorite package manager. If you use `lazy.nvim`:
 ```lua
 {
     "tDalile/gravel.nvim",
-    dependencies = { "nvim-lua/plenary.nvim" },
+    dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim" },
     config = function()
         require("gravel").setup({
-            path = "~/gravel_pit", -- Where you keep your rocks
+            -- Define your piles here
+            piles = {
+                { name = "Default", path = "~/gravel_pit" },
+                { name = "Work", path = "~/work_notes" },
+            },
             daily_format = "%Y-%m-%d",
         })
     end
 }
-
 ```
+
+*(Note: `path` is still supported for single-pile configurations for backward compatibility)*
 
 ## 🚀 Usage
 
-* `:GravelToss` - Create or follow a link under the cursor.
-* `:GravelDig` - Search for a note (uses Telescope if available, otherwise it just guesses).
-* `:GravelToday` - Open today's daily note.
+### Navigation & Management
+*   `:GravelPiles` - Switch between your defined piles (persisted across sessions).
+*   `:GravelToday` - Open today's daily note.
+*   `:GravelDig` - Search for a note (Telescope).
+*   `:GravelToss` - Follow the link under cursor (`[[WikiLink]]` opens note, `[[http://...]]` opens browser).
 
-## 🗺️ Roadmap
+### Tags (`#hashtags`)
+*   `:GravelTags` - Browse all tags in the current pile, sorted by frequency. Selecting one opens a list of notes containing it.
+*   `:GravelTagInsert` - Insert an existing tag at cursor position (autocompletion helper).
 
-* [ ] Add more rocks.
-* [ ] Make the rocks smoother.
-* [ ] Eventually build a driveway (Graph View).
+### Visual Graph
+*   `:GravelPile` - Open the interactive graph view.
+    *   `h/j/k/l`: Navigate between nodes.
+    *   `<Enter>`: Open selected note.
+    *   `q`: Close graph.
 
 ## 🤝 Contributing
 
