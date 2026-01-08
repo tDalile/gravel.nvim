@@ -41,8 +41,6 @@ Use your favorite package manager. If you use `lazy.nvim`:
 }
 ```
 
-*(Note: `path` is still supported for single-pile configurations for backward compatibility)*
-
 ## 🚀 Usage
 
 ### Navigation & Management
