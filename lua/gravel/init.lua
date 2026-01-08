@@ -5,10 +5,26 @@ M.config = {
 	daily_format = "%Y-%m-%d",
 	follow_on_enter = false,
 	back_with_minus = false,
+    -- piles = nil -- will be initialized in setup
 }
 
 function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+    
+    -- Process Piles Config
+    if not M.config.piles then
+        -- Backward compatibility: Create default pile from path
+        M.config.piles = {
+            { name = "Default", path = M.config.path }
+        }
+    end
+
+    -- Set initial pile if not set (default to first)
+    if not M.current_pile_name then
+        M.current_pile_name = M.config.piles[1].name
+        M.config.path = vim.fn.expand(M.config.piles[1].path)
+    end
+    
 	M.config.path = vim.fn.expand(M.config.path)
 
     -- Define Highlights
@@ -54,6 +70,10 @@ function M.setup(opts)
     
     vim.api.nvim_create_user_command("GravelPile", function()
         require("gravel.pile").toggle()
+    end, {})
+
+    vim.api.nvim_create_user_command("GravelPiles", function()
+        M.select_pile()
     end, {})
 end
 
@@ -113,6 +133,62 @@ function M.dig()
 	else
 		vim.notify("Telescope not found. Install nvim-telescope/telescope.nvim to dig.", vim.log.levels.WARN)
 	end
+end
+
+function M.switch_pile(name)
+    local target_pile = nil
+    for _, pile in ipairs(M.config.piles) do
+        if pile.name == name then
+            target_pile = pile
+            break
+        end
+    end
+
+    if not target_pile then
+        vim.notify("Pile not found: " .. name, vim.log.levels.ERROR)
+        return
+    end
+
+    -- Close generic windows if open to avoid state mismatch
+    if package.loaded["gravel.pile"] and require("gravel.pile").state.win then
+        require("gravel.pile").close()
+    end
+
+    M.config.path = vim.fn.expand(target_pile.path)
+    M.current_pile_name = target_pile.name
+
+    -- Ensure directory exists
+    if vim.fn.isdirectory(M.config.path) == 0 then
+        vim.fn.mkdir(M.config.path, "p")
+    end
+
+    vim.notify("Switched to pile: " .. name .. " (" .. M.config.path .. ")", vim.log.levels.INFO)
+    
+    -- Refresh Sidebar if active
+    if package.loaded["gravel.sidebar"] then
+        require("gravel.sidebar").update()
+    end
+end
+
+function M.select_pile()
+    local pile_names = {}
+    for _, pile in ipairs(M.config.piles) do
+        table.insert(pile_names, pile.name)
+    end
+    
+    vim.ui.select(pile_names, {
+        prompt = "Select Pile:",
+        format_item = function(item)
+            if item == M.current_pile_name then
+                return item .. " (current)"
+            end
+            return item
+        end,
+    }, function(choice)
+        if choice then
+            M.switch_pile(choice)
+        end
+    end)
 end
 
 return M
