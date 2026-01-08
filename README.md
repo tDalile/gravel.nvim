@@ -61,6 +61,13 @@ Use your favorite package manager. If you use `lazy.nvim`:
     *   `<Enter>`: Open selected note.
     *   `q`: Close graph.
 
+## 🗺️ Roadmap
+* [ ] Add more rocks.
+* [ ] Make the rocks smoother.
+* [ ] I like my piles neat and tidy (Templats).
+* [ ] Counting pebbles (Love stats).
+* [x] Eventually build a driveway (Graph View).
+
 ## 🤝 Contributing
 
 Found a bug? It's probably just some dirt mixed in with the stones. Feel free to open a PR or an Issue.
