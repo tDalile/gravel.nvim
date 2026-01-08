@@ -1,60 +1,94 @@
-*nvim-plugin-template.nvim.txt*  For NVIM v0.8.0 Last change: 2025 February 12
+*gravel.txt*	For Neovim 0.8+
 
 ==============================================================================
-Table of Contents                *nvim-plugin-template.nvim-table-of-contents*
+GRAVEL.NVIM                                                      *gravel.nvim*
 
-1. nvim-plugin-template       |nvim-plugin-template.nvim-nvim-plugin-template|
-  - Usage               |nvim-plugin-template.nvim-nvim-plugin-template-usage|
-  - Format             |nvim-plugin-template.nvim-nvim-plugin-template-format|
-  - Test                 |nvim-plugin-template.nvim-nvim-plugin-template-test|
-  - CI                     |nvim-plugin-template.nvim-nvim-plugin-template-ci|
-  - More                 |nvim-plugin-template.nvim-nvim-plugin-template-more|
-  - License MIT   |nvim-plugin-template.nvim-nvim-plugin-template-license-mit|
+The coarse, non-shiny alternative to Obsidian.
+
+    "I don't need a monolith. I just need a pile of rocks." — Happy User
+
+CONTENTS                                                       *gravel-contents*
+
+1. Introduction  ............................................. |gravel-intro|
+2. Setup  .................................................... |gravel-setup|
+3. Commands  ................................................. |gravel-commands|
+4. Piles & Tags  ............................................. |gravel-features|
 
 ==============================================================================
-1. nvim-plugin-template       *nvim-plugin-template.nvim-nvim-plugin-template*
+1. INTRODUCTION                                                 *gravel-intro*
 
-Neovim plugin template; includes automatic documentation generation from
-README, integration tests with Busted, and linting with Stylua
+gravel.nvim brings the "loose rocks" approach to note-taking in Neovim.
+It supports WikiLinks, daily notes, multiple piles, tags, and a physics-based
+graph view.
 
+It is designed to be simple ("loose coupling") and effective.
 
-USAGE                   *nvim-plugin-template.nvim-nvim-plugin-template-usage*
+==============================================================================
+2. SETUP                                                        *gravel-setup*
 
-1. Click `use this template` button generate a repo on your github.
-2. Clone your plugin repo. Open terminal then cd plugin directory.
-3. Run `python3 rename.py your-plugin-name`. This will replace all `nvim-plugin-template` to your `plugin-name`.
-Then it will prompt you input `y` or `n` to remove example codes in `init.lua` and
-`test/plugin_spec.lua`. If you are familiar this repo just input `y`. If you are looking at this template for the first time I suggest you inspect the contents. After this step `rename.py` will also auto-remove.
+Install using your favorite package manager.
 
-Now you have a clean plugin environment. Enjoy!
+Example (lazy.nvim): >lua
+    {
+        "tDalile/gravel.nvim",
+        dependencies = { "nvim-lua/plenary.nvim", "nvim-telescope/telescope.nvim" },
+        config = function()
+            require("gravel").setup({
+                -- Define your piles here
+                piles = {
+                    { name = "Default", path = "~/gravel_pit" },
+                    { name = "Work", path = "~/work_notes" },
+                },
+                daily_format = "%Y-%m-%d",
+                -- Optional:
+                -- follow_on_enter = false, -- Bind <CR> to follow link
+            })
+        end
+    }
+<
 
+==============================================================================
+3. COMMANDS                                                  *gravel-commands*
 
-FORMAT                 *nvim-plugin-template.nvim-nvim-plugin-template-format*
+:GravelPiles                                                    *:GravelPiles*
+    Switch between your defined piles. The selection is persisted across
+    sessions.
 
-The CI uses `stylua` to format the code; customize the formatting by editing
-`.stylua.toml`.
+:GravelToday                                                    *:GravelToday*
+    Open today's daily note (e.g., `2024-01-01.md`).
 
+:GravelDig                                                        *:GravelDig*
+    Search for a note using Telescope.
 
-TEST                     *nvim-plugin-template.nvim-nvim-plugin-template-test*
+:GravelToss                                                      *:GravelToss*
+    Follow the link under the cursor.
+    - `[[WikiLink]]`: Opens the note.
+    - `[[http://...]]`: Opens the URL in your browser.
 
-See Running tests locally
-<https://github.com/nvim-neorocks/nvim-busted-action?tab=readme-ov-file#running-tests-locally>
+:GravelTags                                                      *:GravelTags*
+    Browse all tags (`#hashtag`) in the current pile.
+    Shows usage count. Selecting a tag opens a list of matching notes.
 
+:GravelTagInsert                                            *:GravelTagInsert*
+    Browse and insert a tag at the cursor position. Useful for autocompletion.
 
-CI                         *nvim-plugin-template.nvim-nvim-plugin-template-ci*
+:GravelPile                                                      *:GravelPile*
+    Open the interactive graph view.
+    - `h/j/k/l`: Navigate nodes.
+    - `<Enter>`: Open note.
+    - `q`: Close graph.
 
-- Auto generates doc from README.
-- Runs the nvim-busted-action <https://github.com/nvim-neorocks/nvim-busted-action> for test.
-- Lints with `stylua`.
+==============================================================================
+4. PILES & TAGS                                              *gravel-features*
 
+Piles ~
+Piles are independent directories of notes. You can define as many as you like
+in the setup configuration. The currently active pile is saved in your
+Neovim data directory (`gravel_state.json`) and restored on startup.
 
-MORE                     *nvim-plugin-template.nvim-nvim-plugin-template-more*
-
-To see this template in action, take a look at my other plugins.
-
-
-LICENSE MIT       *nvim-plugin-template.nvim-nvim-plugin-template-license-mit*
-
-Generated by panvimdoc <https://github.com/kdheepak/panvimdoc>
+Tags ~
+Gravek supports standard `#hashtags`. They are not nodes in the graph view
+by default (to keep it clean), but they are fully indexed for searching via
+|:GravelTags|.
 
 vim:tw=78:ts=8:noet:ft=help:norl:
