@@ -11,6 +11,11 @@ M.config = {
 function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", M.config, opts or {})
     
+    -- Ensure state dir exists
+    local state_dir = vim.fn.stdpath("data") -- usually ~/.local/share/nvim
+    if vim.fn.isdirectory(state_dir) == 0 then
+        vim.fn.mkdir(state_dir, "p")
+    end
     -- Process Piles Config
     if not M.config.piles then
         -- Backward compatibility: Create default pile from path
@@ -21,8 +26,23 @@ function M.setup(opts)
 
     -- Set initial pile if not set (default to first)
     if not M.current_pile_name then
-        M.current_pile_name = M.config.piles[1].name
-        M.config.path = vim.fn.expand(M.config.piles[1].path)
+        -- Try to load state
+        local saved_pile = M.load_state()
+        if saved_pile then
+            for _, pile in ipairs(M.config.piles) do
+                if pile.name == saved_pile then
+                    M.current_pile_name = pile.name
+                    M.config.path = vim.fn.expand(pile.path)
+                    break
+                end
+            end
+        end
+
+        -- Fallback if load failed or not found
+        if not M.current_pile_name then
+            M.current_pile_name = M.config.piles[1].name
+            M.config.path = vim.fn.expand(M.config.piles[1].path)
+        end
     end
     
 	M.config.path = vim.fn.expand(M.config.path)
@@ -199,27 +219,93 @@ function M.switch_pile(name)
     if package.loaded["gravel.sidebar"] then
         require("gravel.sidebar").update()
     end
+    
+    M.save_state()
+end
+
+function M.save_state()
+    local state_file = vim.fn.stdpath("data") .. "/gravel_state.json"
+    local file = io.open(state_file, "w")
+    if file then
+        local content = vim.json.encode({ current_pile = M.current_pile_name })
+        file:write(content)
+        file:close()
+    end
+end
+
+function M.load_state()
+    local state_file = vim.fn.stdpath("data") .. "/gravel_state.json"
+    local file = io.open(state_file, "r")
+    if file then
+        local content = file:read("*a")
+        file:close()
+        local ok, data = pcall(vim.json.decode, content)
+        if ok and data then
+            return data.current_pile
+        end
+    end
+    return nil
 end
 
 function M.select_pile()
-    local pile_names = {}
-    for _, pile in ipairs(M.config.piles) do
-        table.insert(pile_names, pile.name)
-    end
+    local piles = M.config.piles
     
-    vim.ui.select(pile_names, {
-        prompt = "Select Pile:",
-        format_item = function(item)
-            if item == M.current_pile_name then
-                return item .. " (current)"
+    -- Try Telescope First
+    local has_telescope, pickers = pcall(require, "telescope.pickers")
+    local has_finders, finders = pcall(require, "telescope.finders")
+    local has_conf, conf = pcall(require, "telescope.config")
+    local has_actions, actions = pcall(require, "telescope.actions")
+    local has_state, action_state = pcall(require, "telescope.actions.state")
+    
+    if has_telescope then
+        pickers.new({}, {
+            prompt_title = "Select Pile",
+            finder = finders.new_table {
+                results = piles,
+                entry_maker = function(entry)
+                    local display = entry.name
+                    if entry.name == M.current_pile_name then
+                        display = display .. " *"
+                    end
+                    return {
+                        value = entry,
+                        display = display,
+                        ordinal = entry.name,
+                    }
+                end
+            },
+            sorter = conf.values.generic_sorter({}),
+            attach_mappings = function(prompt_bufnr, map)
+                actions.select_default:replace(function()
+                    actions.close(prompt_bufnr)
+                    local selection = action_state.get_selected_entry()
+                    if selection then
+                        M.switch_pile(selection.value.name)
+                    end
+                end)
+                return true
             end
-            return item
-        end,
-    }, function(choice)
-        if choice then
-            M.switch_pile(choice)
+        }):find()
+    else
+        -- Fallback
+        local pile_names = {}
+        for _, pile in ipairs(piles) do
+            table.insert(pile_names, pile.name)
         end
-    end)
+        vim.ui.select(pile_names, {
+            prompt = "Select Pile:",
+            format_item = function(item)
+                if item == M.current_pile_name then
+                    return item .. " (current)"
+                end
+                return item
+            end,
+        }, function(choice)
+            if choice then
+                M.switch_pile(choice)
+            end
+        end)
+    end
 end
 
 function M.get_tags()
