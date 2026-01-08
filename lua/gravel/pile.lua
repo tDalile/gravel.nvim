@@ -341,7 +341,7 @@ function M.toggle_help()
     -- Create Help Window
     local buf = vim.api.nvim_create_buf(false, true)
     local width = 40
-    local height = 6
+    local height = 7
     local ui = vim.api.nvim_list_uis()[1]
     local row = math.floor((ui.height - height) / 2)
     local col = math.floor((ui.width - width) / 2)
@@ -362,6 +362,7 @@ function M.toggle_help()
         "",
         "  h, j, k, l :  Jump to Node",
         "  <Enter>    :  Open Node",
+        "  m          :  Change Mode",
         "  g?         :  Toggle Help",
         "  q          :  Close Graph",
         "",
