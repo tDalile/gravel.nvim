@@ -1,9 +1,63 @@
 local M = {}
 
 function M.scan(path, graph, callback)
-    -- Start async scan
-    -- We assume `rg` (ripgrep) is available, fallback to `grep` if needed.
+    -- PASS 1: List all files to ensure every node exists (even if disconnected)
+    local fd_cmd = "fd"
+    local fd_args = {
+        ".",
+        "--extension", "md",
+        "--type", "f",
+        path
+    }
     
+    -- Check for fd, fallback to find? (Simplified: warn if missing)
+    if vim.fn.executable("fd") == 0 then
+        vim.notify("Gravel: 'fd' not found. Partial graph (linked only).", vim.log.levels.WARN)
+        -- Fallback to just RG (Pass 2 only)
+        M._scan_links(path, graph, callback)
+        return
+    end
+
+    local stdout = vim.uv.new_pipe(false)
+    local stderr = vim.uv.new_pipe(false)
+    
+    local handle
+    handle = vim.uv.spawn(fd_cmd, {
+        args = fd_args,
+        stdio = { nil, stdout, stderr }
+    }, function(code, signal)
+        stdout:close()
+        stderr:close()
+        handle:close()
+        
+        vim.schedule(function()
+            -- Pass 1 Done: Now run Pass 2 (Links)
+            M._scan_links(path, graph, callback)
+        end)
+    end)
+    
+    local data_buffer = ""
+    vim.uv.read_start(stdout, function(err, data)
+        assert(not err, err)
+        if data then
+            data_buffer = data_buffer .. data
+        else
+            -- EOF: Process Files
+            local files = vim.split(data_buffer, "\n")
+            vim.schedule(function()
+                for _, file in ipairs(files) do
+                    if file ~= "" then
+                         local id = vim.fn.fnamemodify(file, ":t:r")
+                         graph:add_node(id)
+                    end
+                end
+            end)
+        end
+    end)
+end
+
+function M._scan_links(path, graph, callback)
+    -- PASS 2: Find Links (Edges)
     local cmd = "rg"
     local args = {
         "--no-heading",
@@ -15,14 +69,11 @@ function M.scan(path, graph, callback)
     }
     
     if vim.fn.executable("rg") == 0 then
-        -- Fallback to grep? Or just notify error.
-        -- For simplicity, assume ripgrep or strictly grep compatible.
-        -- Grep regex is different.
         print("Gravel: ripgrep (rg) not found. Please install it.")
         if callback then callback(false) end
         return
     end
-
+    
     local stdout = vim.uv.new_pipe(false)
     local stderr = vim.uv.new_pipe(false)
     
@@ -46,9 +97,7 @@ function M.scan(path, graph, callback)
         assert(not err, err)
         if data then
             data_buffer = data_buffer .. data
-            -- Process complete lines
             local lines = vim.split(data_buffer, "\n")
-            -- Keep the last chunk if incomplete
             data_buffer = lines[#lines]
             lines[#lines] = nil
             
@@ -56,7 +105,6 @@ function M.scan(path, graph, callback)
                 M._process_lines(lines, graph)
             end)
         else
-            -- EOF
             if #data_buffer > 0 then
                vim.schedule(function()
                    M._process_lines({data_buffer}, graph)

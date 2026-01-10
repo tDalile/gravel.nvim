@@ -51,14 +51,21 @@ end
 
 function M.open()
     local c = M.state
+
+    -- Auto-Focus: Capture current buffer name (basename) BEFORE creating new window
+    local current_file = vim.fn.expand("%:t:r")
+    if current_file and current_file ~= "" then
+        M.state.initial_focus = current_file
+    else
+        M.state.initial_focus = nil
+    end
+
     c.buf, c.win = UI.create_window()
     
     local width = vim.api.nvim_win_get_width(c.win)
     local height = vim.api.nvim_win_get_height(c.win)
     
     c.graph = Graph.new()
-    c.physics = Physics.new(c.graph)
-    c.physics.width = width * 2 
     c.physics = Physics.new(c.graph)
     c.physics.width = width * 2 
     c.canvas = Canvas.new(width, height - 2) -- Reserve Top (Status) and Bottom (Help)
@@ -70,13 +77,6 @@ function M.open()
     c.physics.width = c.canvas.pixel_width
     c.physics.height = c.canvas.pixel_height
     
-    -- Auto-Focus: Capture current buffer name (basename)
-    local current_file = vim.fn.expand("%:t:r")
-    if current_file and current_file ~= "" then
-        M.state.initial_focus = current_file
-    else
-        M.state.initial_focus = nil
-    end
     M.state.focused_node = nil
     M.state.visible_nodes = {}
     M.state.visible_edges = {}
@@ -150,6 +150,23 @@ function M.open()
            
            -- Initial Visibility Calculation
            M.update_visibility()
+
+           -- Auto-Focus Logic (Immediate)
+           if c.initial_focus and c.graph.nodes[c.initial_focus] then
+               c.focused_node = c.initial_focus
+               local f_node = c.graph.nodes[c.focused_node]
+               -- Center Camera on Focused Node IMMEDIATELY
+               c.camera_x = f_node.x - (c.canvas.pixel_width / 2)
+               c.camera_y = f_node.y - (c.canvas.pixel_height / 2)
+               -- Update Visibility again in case of Local Mode switch
+               M.update_visibility()
+           elseif c.graph.node_count > 0 then
+                -- Default to first node
+                c.focused_node = c.graph.nodes_list[1].id
+                M.update_visibility()
+           end
+           
+           c.initial_focus = nil -- Consume
        end
     end)
     
@@ -386,14 +403,8 @@ function M.step()
     -- Ensure we have a focus if nodes exist
     -- Ensure we have a focus if nodes exist
     if not c.focused_node and c.graph.node_count > 0 then
-        -- Default to initial_focus if valid, else first node
-        if c.initial_focus and c.graph.nodes[c.initial_focus] then
-            c.focused_node = c.initial_focus
-            c.initial_focus = nil -- Clear so we don't override user navigation later
-        else
-            c.focused_node = c.graph.nodes_list[1].id
-        end
-        -- Important: Update visibility now that we have a focus!
+         -- Fallback if scan callback missed it (shouldn't happen)
+        c.focused_node = c.graph.nodes_list[1].id
         M.update_visibility()
     end
     
