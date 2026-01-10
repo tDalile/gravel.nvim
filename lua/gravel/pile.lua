@@ -12,8 +12,18 @@ M.state = {
     graph = nil,
     physics = nil,
     canvas = nil,
+    canvas = nil,
     timer = nil,
-    running = false
+    running = false,
+    mode = "auto", -- auto, global, local
+    visible_nodes = nil,
+    visible_edges = nil,
+    focused_node = nil,
+    initial_focus = nil,
+    camera_x = 0,
+    camera_y = 0,
+    world_width = 100,
+    world_height = 100
 }
 
 function M.toggle()
@@ -53,6 +63,10 @@ function M.open()
     c.physics.width = width * 2 
     c.canvas = Canvas.new(width, height - 2) -- Reserve Top (Status) and Bottom (Help)
     
+    -- Initial Reheat to ensure start
+    c.physics:reheat()
+    
+    
     c.physics.width = c.canvas.pixel_width
     c.physics.height = c.canvas.pixel_height
     
@@ -64,6 +78,8 @@ function M.open()
         M.state.initial_focus = nil
     end
     M.state.focused_node = nil
+    M.state.visible_nodes = {}
+    M.state.visible_edges = {}
     
     -- Setup Keymap
     local opts = { buffer = c.buf, nowait = true, silent = true }
@@ -77,20 +93,63 @@ function M.open()
     vim.keymap.set("n", "k", function() M.move_focus("up") end, opts)
     vim.keymap.set("n", "l", function() M.move_focus("right") end, opts)
     
+    -- Mode Toggle
+    vim.keymap.set("n", "m", M.toggle_mode, opts)
+    
+    -- Zoom Controls
+    vim.keymap.set("n", "+", function() M.zoom("in") end, opts)
+    vim.keymap.set("n", "-", function() M.zoom("out") end, opts)
+    vim.keymap.set("n", "=", function() M.zoom("reset") end, opts)
+    
     -- Start Scan
     local path = Gravel.config.path
     Scanner.scan(path, c.graph, function(done)
        if done and c.physics then
-           -- Center all nodes to explode from middle
-           local cx = c.physics.width / 2
-           local cy = c.physics.height / 2
+           -- Auto-Mode Logic & Infinite WORLD SIZING
+           local N = c.graph.node_count
+           
+           if N > 100 then
+               c.mode = "local"
+               vim.notify("Big Pile! Switched to Local Mode (M to toggle)", vim.log.levels.INFO)
+           else
+               c.mode = "global"
+           end
+           
+           -- Infinite Canvas Calculation
+           -- Expand world based on node count to maintain constant density
+           local win_w = c.canvas.pixel_width
+           local win_h = c.canvas.pixel_height
+           
+           -- Density Target: ~150 nodes per window-area
+           local scale_factor = math.max(1.0, math.sqrt(N / 150))
+           
+           c.world_width = math.floor(win_w * scale_factor)
+           c.world_height = math.floor(win_h * scale_factor)
+           
+           -- Update Physics World
+           c.physics.width = c.world_width
+           c.physics.height = c.world_height
+           
+           -- Center Camera initially (Centered on World Center)
+           -- Camera Coords = Top-Left of Viewport relative to World Top-Left
+           c.camera_x = (c.world_width - win_w) / 2
+           c.camera_y = (c.world_height - win_h) / 2
+           
+           -- Center all nodes to explode from middle of WORLD
+           local cx = c.world_width / 2
+           local cy = c.world_height / 2
+           
            for _, node in ipairs(c.graph.nodes_list) do
-               -- Small random jitter to avoid stacking perfectly
-               node.x = cx + (math.random() - 0.5) * 5
-               node.y = cy + (math.random() - 0.5) * 5
+               -- Spread out more initially to prevent "Explosion" (repulsion spike)
+               -- Random within center 20% of WORLD
+               node.x = cx + (math.random() - 0.5) * (c.world_width * 0.2)
+               node.y = cy + (math.random() - 0.5) * (c.world_height * 0.2)
                node.vx = 0
                node.vy = 0
            end
+           
+           -- Initial Visibility Calculation
+           M.update_visibility()
        end
     end)
     
@@ -108,7 +167,8 @@ end
 
 function M.move_focus(dir)
     local c = M.state
-    local nodes = c.graph.nodes_list
+    -- Navigate only visible nodes
+    local nodes = c.visible_nodes or c.graph.nodes_list
     if #nodes == 0 then return end
     
     -- Get current focused node or pick first
@@ -165,6 +225,83 @@ function M.move_focus(dir)
     
     if best_node then
         c.focused_node = best_node.id
+        M.update_visibility()
+        if c.physics then c.physics:reheat() end
+    end
+end
+
+function M.toggle_mode()
+    local c = M.state
+    if c.mode == "local" then
+        c.mode = "global"
+        vim.notify("Graph Mode: Global", vim.log.levels.INFO)
+    else
+        c.mode = "local"
+        vim.notify("Graph Mode: Local", vim.log.levels.INFO)
+    end
+    M.update_visibility()
+    if c.physics then c.physics:reheat() end
+end
+
+function M.zoom(dir)
+    local c = M.state
+    if not c.physics then return end
+    
+    if dir == "in" then
+        c.physics.zoom_scale = math.min(100.0, c.physics.zoom_scale + 0.1)
+    elseif dir == "out" then
+        c.physics.zoom_scale = math.max(0.01, c.physics.zoom_scale - 0.1)
+    elseif dir == "reset" then
+        c.physics.zoom_scale = 1.0
+    end
+    
+    vim.notify(string.format("Zoom: %.1fx", c.physics.zoom_scale), vim.log.levels.INFO)
+    c.physics:reheat()
+end
+
+function M.update_visibility()
+    local c = M.state
+    if not c.graph then return end
+    
+    if c.mode == "global" or (c.mode == "auto" and c.graph.node_count <= 100) then
+        c.visible_nodes = c.graph.nodes_list
+        c.visible_edges = c.graph.edges
+    else
+        -- Local Mode
+        if c.focused_node then
+            local subgraph = c.graph:get_neighborhood(c.focused_node, 1) -- Depth 1
+            c.visible_nodes = subgraph.nodes
+            c.visible_edges = subgraph.edges
+        else
+            c.visible_nodes = {}
+            c.visible_edges = {}
+        end
+    end
+    
+    -- Dynamic Physics Tuning
+    if c.physics and c.visible_nodes then
+        local N = #c.visible_nodes
+        if N > 500 then
+            c.physics.fast_mode = true
+            c.physics.damping = 0.95 -- Very high damping for stability
+            c.physics.repulsion = 100 -- Minimal repulsion for extreme density
+            c.physics.stiffness = 1.5 -- Strong bonds to prevent drifting
+        elseif N > 300 then
+            c.physics.fast_mode = true
+            c.physics.damping = 0.90 -- "Thick syrup" to force settling
+            c.physics.repulsion = 200 -- Very low repulsion for tight packing
+            c.physics.stiffness = 1.2 -- Stronger bonds
+        elseif N > 100 then
+             c.physics.fast_mode = false
+            c.physics.repulsion = 300 -- Reduced to show clusters
+            c.physics.damping = 0.90 -- High damping for stability
+            c.physics.stiffness = 1.2
+        else
+            c.physics.fast_mode = false
+            c.physics.repulsion = 1000 -- Standard
+            c.physics.damping = 0.7
+            c.physics.stiffness = 1.0
+        end
     end
 end
 
@@ -184,9 +321,58 @@ local ns_id = vim.api.nvim_create_namespace("gravel_pile")
 
 function M.step()
     local c = M.state
-    -- Physics
-    c.physics:step()
     
+    -- Ensure Visibility set
+    if not c.visible_nodes or #c.visible_nodes == 0 then
+        -- Default to global if not set or empty
+        -- But for local mode, we need update_visibility to run once focused_node is set
+        if c.graph.node_count > 0 then
+             -- Try update if we have focus
+             if c.focused_node then
+                 M.update_visibility()
+             else
+                 -- If no focus yet, global
+                 c.visible_nodes = c.graph.nodes_list
+                 c.visible_edges = c.graph.edges
+             end
+        end
+    end
+
+    -- Physics (Subset)
+    c.physics:step(c.visible_nodes, c.visible_edges)
+    
+    -- === CAMERA UPDATE ===
+    local win_w = c.canvas.pixel_width
+    local win_h = c.canvas.pixel_height
+    
+    local target_cam_x = c.camera_x
+    local target_cam_y = c.camera_y
+    
+    if c.focused_node and c.graph.nodes[c.focused_node] then
+        local node = c.graph.nodes[c.focused_node]
+        -- Center the focused node
+        -- Target = NodePos - HalfWindow
+        target_cam_x = node.x - (win_w / 2)
+        target_cam_y = node.y - (win_h / 2)
+    elseif c.graph.node_count > 0 then
+         -- Fallback: World Center
+         target_cam_x = (c.world_width - win_w) / 2
+         target_cam_y = (c.world_height - win_h) / 2
+    end
+    
+    -- Clamp Camera to World Bounds (Keep at least part of window in world)
+    -- Actually, let's clamp rigidly so we don't view void
+    -- Min: 0. Max: WorldW - WinW
+    if target_cam_x < 0 then target_cam_x = 0 end
+    if target_cam_y < 0 then target_cam_y = 0 end
+    if target_cam_x > (c.world_width - win_w) then target_cam_x = math.max(0, c.world_width - win_w) end
+    if target_cam_y > (c.world_height - win_h) then target_cam_y = math.max(0, c.world_height - win_h) end
+    
+    -- Lerp (Smooth Follow)
+    c.camera_x = c.camera_x + (target_cam_x - c.camera_x) * 0.1
+    c.camera_y = c.camera_y + (target_cam_y - c.camera_y) * 0.1
+    
+    -- Ensure we have a focus if nodes exist
     -- Ensure we have a focus if nodes exist
     if not c.focused_node and c.graph.node_count > 0 then
         -- Default to initial_focus if valid, else first node
@@ -196,6 +382,8 @@ function M.step()
         else
             c.focused_node = c.graph.nodes_list[1].id
         end
+        -- Important: Update visibility now that we have a focus!
+        M.update_visibility()
     end
     
     -- Park cursor at 1,1 to "hide" it
@@ -206,7 +394,10 @@ function M.step()
     -- Render
     c.canvas:clear()
     
-    -- Draw Edges
+    -- Draw Edges (Visible Only)
+    local edges_to_draw = c.visible_edges or c.graph.edges
+    local nodes_to_draw = c.visible_nodes or c.graph.nodes_list
+    
     -- We'll draw them in two passes: dimmed (unfocused) then focused
     local focused_edges = {}
     
@@ -214,31 +405,35 @@ function M.step()
     local now_ms = vim.uv.now()
     local t = (now_ms % anim_cycle_ms) / anim_cycle_ms -- 0.0 to 1.0
 
-    for _, edge in ipairs(c.graph.edges) do
+    for _, edge in ipairs(edges_to_draw) do
         local is_focused = (c.focused_node and (edge.source.id == c.focused_node or edge.target.id == c.focused_node))
         
         if is_focused then
             table.insert(focused_edges, edge)
         else
             -- Dimmed standard edge
-            c.canvas:draw_line(
-                edge.source.x, edge.source.y, 
-                edge.target.x, edge.target.y,
-                "GravelEdge"
-            )
+            -- Skip drawing standard edges if massive pile (> 300) to reduce noise
+                if #nodes_to_draw <= 300 then
+                c.canvas:draw_line(
+                    edge.source.x - c.camera_x, edge.source.y - c.camera_y, 
+                    edge.target.x - c.camera_x, edge.target.y - c.camera_y,
+                    "GravelEdge"
+                )
+            end
         end
     end
 
     -- Draw Focused Edges & Animation on top
     for _, edge in ipairs(focused_edges) do
-        local sx, sy = edge.source.x, edge.source.y
-        local tx, ty = edge.target.x, edge.target.y
+        local sx, sy = edge.source.x - c.camera_x, edge.source.y - c.camera_y
+        local tx, ty = edge.target.x - c.camera_x, edge.target.y - c.camera_y
         
         -- Highlight Line (Always if focused)
         c.canvas:draw_line(sx, sy, tx, ty, "GravelEdgeFocus")
         
         -- Animate Particle (Direction: Source -> Target)
-        if Gravel.config.animate_edges then
+        -- Disable in Global Mode to save resources and reduce noise
+        if Gravel.config.animate_edges and c.mode ~= "global" then
             local px = sx + (tx - sx) * t
             local py = sy + (ty - sy) * t
             
@@ -258,8 +453,9 @@ function M.step()
         focused_node_obj = c.graph.nodes[c.focused_node]
     end
     
-    -- Draw Nodes (Heatmap)
-    for _, node in ipairs(c.graph.nodes_list) do
+    
+    -- Draw Nodes (Heatmap) - Visible Only
+    for _, node in ipairs(nodes_to_draw) do
         local hl = "GravelNodeLeaf"
         if node.degree >= 5 then
             hl = "GravelNodeHub"
@@ -273,15 +469,59 @@ function M.step()
         end
         
         -- Use Symbol for node
-        c.canvas:set_symbol(node.x, node.y, "●", hl)
+        -- Simplify symbol for dense graphs
+        local sym = (#nodes_to_draw > 100) and "·" or "●"
+        c.canvas:set_symbol(node.x - c.camera_x, node.y - c.camera_y, sym, hl)
+    end
+    
+    -- === SCROLLBARS ===
+    -- Only draw if world is larger than window
+    if c.world_height > win_h then
+        local ratio = win_h / c.world_height
+        local thumb_h = math.max(1, math.floor(ratio * win_h))
+        local thumb_y = (c.camera_y / c.world_height) * win_h
+        
+        -- Draw Vertical Bar on Right Edge
+        for i = 0, thumb_h do
+             c.canvas:set_symbol(win_w - 2, thumb_y + i, "┃", "Comment")
+        end
+    end
+    
+    if c.world_width > win_w then
+        local ratio = win_w / c.world_width
+        local thumb_w = math.max(1, math.floor(ratio * win_w))
+        local thumb_x = (c.camera_x / c.world_width) * win_w
+        
+        -- Draw Horizontal Bar on Bottom Edge
+        for i = 0, thumb_w do
+             c.canvas:set_symbol(thumb_x + i, win_h - 2, "━", "Comment")
+        end
     end
     
     local canvas_lines, highlights = c.canvas:render()
     
     -- Assemble Buffer Lines
     -- 1. Status Line (Top)
-    local status = string.format(" Nodes: %d | Edges: %d | Path: %s", 
-        c.graph.node_count, #c.graph.edges, Gravel.config.path)
+    local on_screen_count = 0
+    if c.visible_nodes then
+        for _, n in ipairs(c.visible_nodes) do
+            local sx = n.x - c.camera_x
+            local sy = n.y - c.camera_y
+            if sx >= 0 and sx < win_w and sy >= 0 and sy < win_h then
+                on_screen_count = on_screen_count + 1
+            end
+        end
+    end
+
+    local pile_name = Gravel.current_pile_name or "Default"
+    
+    local sim_state = " [F] "
+    if c.physics.temperature > c.physics.min_temperature then
+        sim_state = " [S] " -- Settling
+    end
+
+    local status = string.format(" Visible:%d | Total:%d | Mode:%s | Pile:%s", 
+        on_screen_count, c.graph.node_count, string.upper(c.mode), pile_name)
     
     local final_lines = {}
     table.insert(final_lines, status)
@@ -314,8 +554,11 @@ function M.step()
     
     -- Apply Label via Virtual Text
     if focused_node_obj then
-        local char_x = math.floor(focused_node_obj.x / 2)
-        local char_y = math.floor(focused_node_obj.y / 4)
+        local screen_x = focused_node_obj.x - c.camera_x
+        local screen_y = focused_node_obj.y - c.camera_y
+        
+        local char_x = math.floor(screen_x / 2)
+        local char_y = math.floor(screen_y / 4)
         -- Show below the node
         local label_opts = {
             virt_text = {{focused_node_obj.id, "GravelNodeFocus"}},
@@ -341,7 +584,7 @@ function M.toggle_help()
     -- Create Help Window
     local buf = vim.api.nvim_create_buf(false, true)
     local width = 40
-    local height = 7
+    local height = 8
     local ui = vim.api.nvim_list_uis()[1]
     local row = math.floor((ui.height - height) / 2)
     local col = math.floor((ui.width - width) / 2)
@@ -363,6 +606,7 @@ function M.toggle_help()
         "  h, j, k, l :  Jump to Node",
         "  <Enter>    :  Open Node",
         "  m          :  Change Mode",
+        "  +, -       :  Zoom",
         "  g?         :  Toggle Help",
         "  q          :  Close Graph",
         "",

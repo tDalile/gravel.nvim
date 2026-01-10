@@ -47,6 +47,9 @@ end
 
 function M.Canvas:set_pixel(x, y, color_hl)
     -- x, y are roughly 0-based virtual pixels
+    -- NaN Check
+    if not (x and y) or x ~= x or y ~= y then return end
+    
     if x < 0 or x >= self.pixel_width or y < 0 or y >= self.pixel_height then
         return
     end
