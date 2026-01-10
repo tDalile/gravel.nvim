@@ -255,6 +255,17 @@ function M.zoom(dir)
         c.physics.zoom_scale = 1.0
     end
     
+    -- Auto-Switch Mode based on Zoom
+    if c.physics.zoom_scale >= 3.0 and c.mode == "global" then
+        c.mode = "local"
+        vim.notify(string.format("Zoom > 3.0: Switched to Local Mode"), vim.log.levels.INFO)
+        M.update_visibility()
+    elseif c.physics.zoom_scale <= 2.0 and c.mode == "local" then
+        c.mode = "global"
+        vim.notify(string.format("Zoom < 2.0: Switched to Global Mode"), vim.log.levels.INFO)
+        M.update_visibility()
+    end
+    
     vim.notify(string.format("Zoom: %.1fx", c.physics.zoom_scale), vim.log.levels.INFO)
     c.physics:reheat()
 end
