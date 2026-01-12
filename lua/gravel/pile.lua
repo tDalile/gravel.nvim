@@ -496,29 +496,7 @@ function M.step()
         c.canvas:set_symbol(node.x - c.camera_x, node.y - c.camera_y, sym, hl)
     end
     
-    -- === SCROLLBARS ===
-    -- Only draw if world is larger than window
-    if c.world_height > win_h then
-        local ratio = win_h / c.world_height
-        local thumb_h = math.max(1, math.floor(ratio * win_h))
-        local thumb_y = (c.camera_y / c.world_height) * win_h
-        
-        -- Draw Vertical Bar on Right Edge
-        for i = 0, thumb_h do
-             c.canvas:set_symbol(win_w - 2, thumb_y + i, "┃", "Comment")
-        end
-    end
-    
-    if c.world_width > win_w then
-        local ratio = win_w / c.world_width
-        local thumb_w = math.max(1, math.floor(ratio * win_w))
-        local thumb_x = (c.camera_x / c.world_width) * win_w
-        
-        -- Draw Horizontal Bar on Bottom Edge
-        for i = 0, thumb_w do
-             c.canvas:set_symbol(thumb_x + i, win_h - 2, "━", "Comment")
-        end
-    end
+
     
     local canvas_lines, highlights = c.canvas:render()
     
